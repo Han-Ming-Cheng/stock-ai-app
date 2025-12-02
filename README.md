@@ -1,5 +1,7 @@
 📈 Stock AI App
 
+使用網址: https://stock-ai-app-c6evappbapgfta6oozgqfx.streamlit.app/
+
 基於 Groq Llama 3.1 的智慧股票分析工具，整合「即時股價」、「K 線圖」、「移動平均線」、「成交量」、「AI 財報分析」、「文件（PDF/TXT）摘要與翻譯」等功能。
 
 🚀 主要功能
