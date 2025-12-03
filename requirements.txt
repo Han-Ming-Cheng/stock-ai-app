@@ -4,3 +4,5 @@ yfinance
 plotly
 groq
 pdfplumber
+google-generativeai
+
