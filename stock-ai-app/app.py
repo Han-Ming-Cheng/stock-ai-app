@@ -1,4 +1,6 @@
 from __future__ import annotations
+import os
+
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -16,9 +18,82 @@ from core.ai_analyzer import (
     extract_earnings_insights,
     translate_transcript_paragraphs,
     analyze_earnings_transcript,
+    review_question,  # 問題審查器
 )
 
-st.set_page_config(page_title="美股 AI 分析工具", layout="wide")
+# ========== 這裡可以選擇直接寫死 API（測試用） ==========
+# 不想每次在終端機設環境變數，可以暫時這樣寫：
+# os.environ["GOOGLE_API_KEY"] = "你的GoogleAPIKey"
+
+
+# ========= Google Gemini 模型選項 =========
+MODEL_OPTIONS = {
+    "⚡ Gemini 2.0 Flash（快速）": "gemini-2.0-flash",
+    "🧠 Gemini 1.5 Pro（深度推理）": "gemini-1.5-pro",
+}
+
+st.set_page_config(page_title="美股 AI 分析工具（Gemini 版）", layout="wide")
+
+
+# ========= 全域 UI 美化 =========
+def inject_global_css():
+    st.markdown(
+        """
+        <style>
+        .main {
+            background-color: #f5f7fb;
+        }
+        .stApp {
+            background-color: #f5f7fb;
+        }
+
+        h1, h2, h3 {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        h1 {
+            font-weight: 700;
+        }
+
+        .ai-card {
+            padding: 1.1rem 1.2rem;
+            border-radius: 0.9rem;
+            background: #ffffff;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+            margin-bottom: 1.2rem;
+        }
+
+        .ai-card-title {
+            font-weight: 600;
+            font-size: 1.05rem;
+            margin-bottom: 0.6rem;
+        }
+
+        .streamlit-expanderHeader {
+            font-weight: 600;
+        }
+        .streamlit-expander {
+            border-radius: 0.75rem !important;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+            border: 1px solid #e2e8f0;
+        }
+
+        section[data-testid="stSidebar"] {
+            background-color: #0f172a;
+            color: #e5e7eb;
+        }
+        section[data-testid="stSidebar"] h1,
+        section[data-testid="stSidebar"] h2,
+        section[data-testid="stSidebar"] h3,
+        section[data-testid="stSidebar"] label {
+            color: #e5e7eb !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+inject_global_css()
 
 # ========= 初始化 Session State =========
 if "analyzed" not in st.session_state:
@@ -116,7 +191,7 @@ def fetch_last_daily_ma_volume(symbol: str):
         return None
 
 
-# ========= 專業版圖表（K 線綠漲紅跌 + MA 疊線 + 彩色畫線 + 多步 Undo/Redo） =========
+# ========= 專業版圖表（K 線 + MA + 畫線工具 + RSI/Volume） =========
 def render_pro_chart(hist: pd.DataFrame, period: str):
     st.subheader(f"📉 股價走勢（{period}）")
 
@@ -137,10 +212,10 @@ def render_pro_chart(hist: pd.DataFrame, period: str):
         st.info("⚠ 此股票缺少開高低收（OHLC）資料，無法顯示 K 線圖。")
         chart_type = "收盤價折線圖"
 
-    # 👉 是否顯示 MA 線 的切換按鈕
+    # 是否顯示 MA 線
     show_ma = st.checkbox("顯示 MA5 / MA10 / MA20", value=True)
 
-    # 👉 計算 MA5 / MA10 / MA20
+    # 計算 MA5 / MA10 / MA20
     ma_df = None
     if "Close" in hist.columns:
         close = hist["Close"]
@@ -158,11 +233,10 @@ def render_pro_chart(hist: pd.DataFrame, period: str):
                 y=hist["Close"],
                 mode="lines",
                 name="收盤價",
-                line=dict(color="#0050b3", width=2),  # ⭐ 收盤價深藍色
+                line=dict(color="#0050b3", width=2),
             )
         )
 
-        # 把 MA 線疊到折線圖上（若有打勾）
         if show_ma and ma_df is not None:
             if ma_df["MA5"].notna().any():
                 fig.add_trace(
@@ -171,7 +245,7 @@ def render_pro_chart(hist: pd.DataFrame, period: str):
                         y=ma_df["MA5"],
                         mode="lines",
                         name="MA5",
-                        line=dict(color="#ffa500", width=1.5),  # ⭐ 橘
+                        line=dict(color="#ffa500", width=1.5),
                     )
                 )
             if ma_df["MA10"].notna().any():
@@ -181,7 +255,7 @@ def render_pro_chart(hist: pd.DataFrame, period: str):
                         y=ma_df["MA10"],
                         mode="lines",
                         name="MA10",
-                        line=dict(color="#2ca02c", width=1.3),  # ⭐ 綠
+                        line=dict(color="#2ca02c", width=1.3),
                     )
                 )
             if ma_df["MA20"].notna().any():
@@ -191,7 +265,7 @@ def render_pro_chart(hist: pd.DataFrame, period: str):
                         y=ma_df["MA20"],
                         mode="lines",
                         name="MA20",
-                        line=dict(color="#9467bd", width=1.3),  # ⭐ 紫
+                        line=dict(color="#9467bd", width=1.3),
                     )
                 )
 
@@ -214,9 +288,8 @@ def render_pro_chart(hist: pd.DataFrame, period: str):
                     )
                 ]
             )
-        except Exception as e:
-            ...
-            # 這裡如果 fallback 成折線圖記得也改顏色
+        except Exception:
+            # fallback 成折線圖
             fig = go.Figure()
             fig.add_trace(
                 go.Scatter(
@@ -224,11 +297,10 @@ def render_pro_chart(hist: pd.DataFrame, period: str):
                     y=hist["Close"],
                     mode="lines",
                     name="收盤價",
-                    line=dict(color="#0050b3", width=2),  # ⭐ 一樣深藍
+                    line=dict(color="#0050b3", width=2),
                 )
             )
 
-        # 把 MA 線疊到 K 線圖上（若有打勾）
         if show_ma and ma_df is not None:
             if ma_df["MA5"].notna().any():
                 fig.add_trace(
@@ -272,7 +344,6 @@ def render_pro_chart(hist: pd.DataFrame, period: str):
 
     fig_json = fig.to_json()
 
-    # 原生 Plotly.js + JS 控制畫線 / Undo / Redo
     html_code = f"""
 <div id="plot" style="width: 100%; height: 560px;"></div>
 <div style="margin-top: 8px;">
@@ -399,11 +470,45 @@ def render_pro_chart(hist: pd.DataFrame, period: str):
 """
     components.html(html_code, height=620)
 
+    # 額外技術指標（RSI + Volume）
+    with st.expander("📊 額外技術指標（RSI / 成交量）", expanded=False):
+        if "Close" in hist.columns:
+            close = hist["Close"].dropna()
+            if len(close) > 15:
+                delta = close.diff()
+                gain = delta.clip(lower=0).rolling(14).mean()
+                loss = (-delta.clip(upper=0)).rolling(14).mean()
+                rs = gain / loss
+                rsi = 100 - (100 / (1 + rs))
+                rsi_df = pd.DataFrame({"RSI(14)": rsi})
+                st.line_chart(rsi_df)
+            else:
+                st.caption("RSI 資料不足（至少需要 15 根 K）。")
+        if "Volume" in hist.columns:
+            vol_df = hist[["Volume"]].rename(columns={"Volume": "成交量"})
+            st.bar_chart(vol_df)
+
 
 # ========= 主程式 =========
 def main():
-    st.title("📈 美股智慧 AI 分析")
+    st.title("📈 美股智慧 AI 分析（Google Gemini）")
     st.caption("輸入股票代號（例如：AAPL、TSLA、NVDA）")
+
+    # 側邊欄：選 Gemini 模型
+    with st.sidebar:
+        st.header("⚙️ AI 模型設定")
+        model_label = st.selectbox(
+            "選擇 Gemini 模型（影響分析深度與速度）",
+            list(MODEL_OPTIONS.keys()),
+            index=0,
+        )
+        selected_model = MODEL_OPTIONS[model_label]
+        st.markdown(
+            """
+            - ⚡ Flash：回應快、成本低  
+            - 🧠 1.5 Pro：推理更強、解釋更詳細  
+            """
+        )
 
     col_input, col_period = st.columns([3, 1])
     with col_input:
@@ -448,10 +553,11 @@ def main():
 
             left, right = st.columns([2.2, 1.8])
 
-            # ================= 左邊：即時價 + MA/Volume + 基本 + 圖 + 指標 + 財報 =================
+            # 左邊：即時價 + MA + 基本資料 + 圖 + 指標 + 財報表
             with left:
                 # 即時價區
-                st.subheader("⏱ 近一小時 / 最近收盤價")
+                st.markdown('<div class="ai-card">', unsafe_allow_html=True)
+                st.markdown('<div class="ai-card-title">⏱ 近一小時 / 最近收盤價</div>', unsafe_allow_html=True)
                 rt = fetch_last_1h_price(clean_symbol)
                 if rt is not None:
                     c1, c2 = st.columns(2)
@@ -471,9 +577,11 @@ def main():
                         )
                 else:
                     st.info("目前無法取得近一小時或收盤價（資料來源限制）。")
+                st.markdown("</div>", unsafe_allow_html=True)
 
                 # 最近一個交易日 MA / Volume
-                st.subheader("📆 最近一個交易日：均線 / 成交量")
+                st.markdown('<div class="ai-card">', unsafe_allow_html=True)
+                st.markdown('<div class="ai-card-title">📆 最近一個交易日：均線 / 成交量</div>', unsafe_allow_html=True)
                 ma_info = fetch_last_daily_ma_volume(clean_symbol)
                 if ma_info is not None:
                     ma_table = pd.DataFrame(
@@ -491,19 +599,23 @@ def main():
                     st.table(ma_table)
                 else:
                     st.info("無法取得最近交易日的均線與成交量資訊。")
+                st.markdown("</div>", unsafe_allow_html=True)
 
-                st.subheader("📌 基本資訊")
+                st.markdown('<div class="ai-card">', unsafe_allow_html=True)
+                st.markdown('<div class="ai-card-title">📌 基本資訊</div>', unsafe_allow_html=True)
                 st.write(f"**{display_name} ({clean_symbol})**")
                 st.write(
                     f"{basic.get('sector')} / {basic.get('industry')} | "
                     f"{basic.get('country')} | 貨幣：{basic.get('currency')}"
                 )
+                st.markdown("</div>", unsafe_allow_html=True)
 
-                # 專業版圖表
+                st.markdown('<div class="ai-card">', unsafe_allow_html=True)
                 render_pro_chart(hist, period)
+                st.markdown("</div>", unsafe_allow_html=True)
 
-                # 指標摘要
-                st.subheader("📊 指標摘要")
+                st.markdown('<div class="ai-card">', unsafe_allow_html=True)
+                st.markdown('<div class="ai-card-title">📊 指標摘要</div>', unsafe_allow_html=True)
                 val = indicators["valuation"]
                 mom = indicators["momentum"]
 
@@ -537,24 +649,50 @@ def main():
                     }
                 )
                 st.table(table)
+                st.markdown("</div>", unsafe_allow_html=True)
 
-                # 財報
-                st.subheader("📑 最近四季損益表")
+                st.markdown('<div class="ai-card">', unsafe_allow_html=True)
+                st.markdown('<div class="ai-card-title">📑 最近四季損益表</div>', unsafe_allow_html=True)
                 if (
                     financials
                     and "income_q" in financials
                     and financials["income_q"] is not None
                     and not financials["income_q"].empty
                 ):
-                    st.dataframe(financials["income_q"])
+                    income_q = financials["income_q"]
+                    st.dataframe(income_q)
+
+                    cols = income_q.columns
+                    rev_col = next((c for c in cols if "Total Revenue" in str(c)), None)
+                    net_col = next((c for c in cols if "Net Income" in str(c)), None)
+
+                    if rev_col and net_col:
+                        mini = income_q[["period", rev_col, net_col]].copy()
+                        mini = mini.sort_values("period")
+                        mini.rename(
+                            columns={
+                                rev_col: "Revenue",
+                                net_col: "NetIncome",
+                            },
+                            inplace=True,
+                        )
+                        st.caption("最近幾季營收 / 淨利概況（由舊到新）：")
+                        st.table(mini.tail(4))
+
+                        with st.expander("📈 營收 / 淨利簡易趨勢圖"):
+                            chart_df = mini.set_index("period").tail(8)
+                            st.line_chart(chart_df)
+                    else:
+                        st.caption("（此股票損益資料欄位格式較特殊，暫無法自動整理趨勢圖。）")
                 else:
                     st.info("找不到損益資料")
+                st.markdown("</div>", unsafe_allow_html=True)
 
-            # ================= 右邊：AI 分析 =================
+            # 右邊：AI 分析
             with right:
-                st.subheader("🤖 AI 數據分析")
+                st.markdown('<div class="ai-card">', unsafe_allow_html=True)
+                st.markdown('<div class="ai-card-title">🤖 AI 數據分析</div>', unsafe_allow_html=True)
 
-                # 這裡主分析會特別強調目前選的 period
                 main_question = (
                     f"請針對目前取得的股價與基本面數據，"
                     f"特別聚焦在顯示的時間區間「{period}」做一份完整分析。"
@@ -566,39 +704,67 @@ def main():
                     indicators=indicators,
                     price_history=hist,
                     user_question=main_question,
+                    model=selected_model,
                 )
                 st.markdown(summary)
+                st.markdown("</div>", unsafe_allow_html=True)
 
-                st.markdown("---")
-                st.subheader("📊 財報亮點 / 風險 / 展望")
-                insight = extract_earnings_insights(
-                    symbol=clean_symbol,
-                    earnings_data=earnings,
-                    financials=financials,
-                )
-                st.markdown(insight)
+                st.markdown('<div class="ai-card">', unsafe_allow_html=True)
+                st.markdown('<div class="ai-card-title">📊 財報亮點 / 風險 / 展望</div>', unsafe_allow_html=True)
+                try:
+                    insight = extract_earnings_insights(
+                        symbol=clean_symbol,
+                        earnings_data=earnings,
+                        financials=financials,
+                        model=selected_model,
+                    )
+                    if insight is None or not str(insight).strip():
+                        st.info(
+                            "目前找不到足夠的財報數據可以分析，因此暫時無法生成財報亮點。"
+                        )
+                    else:
+                        st.markdown(insight)
+                except Exception as e:
+                    st.error(f"財報分析時發生錯誤：{e}")
+                st.markdown("</div>", unsafe_allow_html=True)
 
-                st.markdown("---")
-                st.markdown("### 追問 AI（可針對特定季度或期間）")
+                st.markdown('<div class="ai-card">', unsafe_allow_html=True)
+                st.markdown('<div class="ai-card-title">🔍 追問 AI（可針對特定季度或期間）</div>', unsafe_allow_html=True)
                 q = st.text_input(
                     "想問什麼？（例：請分析 2025 年第一季的表現、這一年股價波動與估值是否合理…）"
                 )
                 if st.button("送出追問"):
-                    follow_up_question = (
-                        f"目前圖上顯示的時間區間為「{period}」。"
-                        f"請在這段期間的背景下，結合先前提供的數據，"
-                        f"回答以下追問，並盡量以該時間範圍內的變化為主：\n\n{q}"
-                    )
-                    ans = generate_analysis(
+                    review = review_question(
+                        question=q,
                         symbol=clean_symbol,
-                        indicators=indicators,
                         price_history=hist,
-                        user_question=follow_up_question,
+                        financials=financials,
                     )
-                    st.markdown("#### AI 回覆")
-                    st.markdown(ans)
 
-            # ================= 最下方：任意文字檔摘要 + 翻譯 + 防呆檢查（支援 PDF） =================
+                    if review["level"] == "reject":
+                        st.error(review["message"])
+                    else:
+                        if review["level"] == "warn" and review["message"]:
+                            st.warning(review["message"])
+
+                        follow_up_question = (
+                            f"目前圖上顯示的時間區間為「{period}」。"
+                            f"請在這段期間的背景下，結合先前提供的數據，"
+                            f"回答以下追問，並盡量以該時間範圍內的變化為主：\n\n{q}"
+                        )
+                        ans = generate_analysis(
+                            symbol=clean_symbol,
+                            indicators=indicators,
+                            price_history=hist,
+                            user_question=follow_up_question,
+                            model=selected_model,
+                            guard_hint=review.get("system_hint", ""),
+                        )
+                        st.markdown("#### AI 回覆")
+                        st.markdown(ans)
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            # 最下方：文字檔摘要 / 翻譯
             st.markdown("---")
             with st.expander("📄 文字檔摘要 / 翻譯（新聞、財報、法說會逐字稿｜支援 txt / md / pdf）"):
                 st.caption(
@@ -613,11 +779,11 @@ def main():
 
                 text = ""
 
-                # -------- PDF / txt / md 處理 --------
                 if uploaded is not None:
                     if uploaded.type == "application/pdf":
                         try:
                             import pdfplumber
+
                             with pdfplumber.open(uploaded) as pdf:
                                 pages = [page.extract_text() or "" for page in pdf.pages]
                                 text = "\n".join(pages)
@@ -625,16 +791,13 @@ def main():
                             st.error(f"PDF 解析失敗：{e}")
                             text = ""
                     else:
-                        # txt/md
                         text = uploaded.read().decode("utf-8", "ignore")
 
                 elif manual.strip():
                     text = manual.strip()
 
-                # -------- 有文本才進行後續處理 --------
                 if text:
                     if st.button("開始分析文字檔"):
-                        # ---- 防呆：檢查是否真的像是這家公司的內容 ----
                         lower_text = text.lower()
                         keywords = set()
                         keywords.add(clean_symbol.lower())
@@ -655,9 +818,11 @@ def main():
                             )
                         else:
                             with st.spinner("AI 正在進行翻譯與摘要…"):
-                                paragraphs = translate_transcript_paragraphs(text)
+                                paragraphs = translate_transcript_paragraphs(
+                                    text, model=selected_model
+                                )
                                 transcript_summary = analyze_earnings_transcript(
-                                    clean_symbol, text
+                                    clean_symbol, text, model=selected_model
                                 )
 
                             st.subheader("逐段翻譯")
