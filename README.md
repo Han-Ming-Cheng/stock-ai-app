@@ -1,6 +1,6 @@
 📈 Stock AI App
 
-使用網址: https://stock-ai-app-c6evappbapgfta6oozgqfx.streamlit.app/
+使用網址:[ https://stock-ai-app-c6evappbapgfta6oozgqfx.streamlit.app/](https://stock-ai-app-c6evappbapgfta6oozgqfx.streamlit.app/)
 
 📈 美股 AI 財報 & 技術分析工具（Gemini 版）
 
