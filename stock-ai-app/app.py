@@ -21,10 +21,6 @@ from core.ai_analyzer import (
     review_question,  # 問題審查器
 )
 
-# ========== 這裡可以選擇直接寫死 API（測試用） ==========
-# 不想每次在終端機設環境變數，可以暫時這樣寫：
-# os.environ["GOOGLE_API_KEY"] = "你的GoogleAPIKey"
-
 
 # ========= Google Gemini 模型選項 =========
 MODEL_OPTIONS = {
@@ -844,3 +840,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
