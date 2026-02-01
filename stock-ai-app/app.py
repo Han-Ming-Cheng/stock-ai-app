@@ -32,50 +32,44 @@ MODEL_OPTIONS = {
 st.set_page_config(page_title="美股 AI 分析工具（Gemini 版）", layout="wide")
 
 
-# ========= 全域 UI 美化 (V3 修復版：修正側邊欄選單反白問題) =========
+# ========= 全域 UI 美化 (V4 終極修復版：強制白底黑字輸入框) =========
 def inject_global_css():
     st.markdown(
         """
         <style>
-        /* 1. 強制主要區域文字顏色為深色 (解決深色模式下白字白底的問題) */
+        /* 1. 全域設定：強制主畫面亮色背景，文字深色 */
         .stApp {
             background-color: #f5f7fb;
             color: #333333 !important;
         }
-
-        /* 2. 確保主要內容區背景一致 */
         .main {
             background-color: #f5f7fb;
         }
 
-        /* 3. 標題強制深色 */
+        /* 2. 標題強制深色 */
         h1, h2, h3 {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            color: #0f172a !important; /* 深藍黑色 */
+            color: #0f172a !important; 
         }
-        
-        h1 {
-            font-weight: 700;
-        }
+        h1 { font-weight: 700; }
 
-        /* 4. 卡片樣式：強制背景白、文字深 */
+        /* 3. 卡片樣式 */
         .ai-card {
             padding: 1.1rem 1.2rem;
             border-radius: 0.9rem;
             background: #ffffff;
             box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
             margin-bottom: 1.2rem;
-            color: #333333 !important; /* 確保卡片內文字也是深色 */
+            color: #333333 !important;
         }
-
         .ai-card-title {
             font-weight: 600;
             font-size: 1.05rem;
             margin-bottom: 0.6rem;
-            color: #0f172a !important; /* 卡片標題深色 */
+            color: #0f172a !important;
         }
 
-        /* 5. Expander 樣式調整 */
+        /* 4. Expander (摺疊區) */
         .streamlit-expanderHeader {
             font-weight: 600;
             color: #333333 !important;
@@ -85,47 +79,64 @@ def inject_global_css():
             box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
             border: 1px solid #e2e8f0;
             color: #333333 !important;
+            background-color: #ffffff !important;
         }
-        
         .streamlit-expanderContent {
             color: #333333 !important;
         }
 
-        /* 6. 側邊欄維持深色背景 + 淺色文字 (大原則) */
+        /* 5. 側邊欄：深色背景，文字淺色 */
         section[data-testid="stSidebar"] {
             background-color: #0f172a;
-            color: #e5e7eb !important; 
         }
-        
-        /* 側邊欄的一般標籤文字 */
+        /* 側邊欄的一般文字預設為淺色 */
         section[data-testid="stSidebar"] h1,
         section[data-testid="stSidebar"] h2,
         section[data-testid="stSidebar"] h3,
         section[data-testid="stSidebar"] label,
         section[data-testid="stSidebar"] span,
-        section[data-testid="stSidebar"] div,
-        section[data-testid="stSidebar"] p {
+        section[data-testid="stSidebar"] p,
+        section[data-testid="stSidebar"] div.stMarkdown {
             color: #e5e7eb !important;
         }
 
-        /* ========== 7. 修正側邊欄內的輸入框/下拉選單 (關鍵修正) ========== */
-        
-        /* 針對側邊欄內的 Selectbox (下拉選單) 容器 -> 強制文字為黑色 */
-        section[data-testid="stSidebar"] div[data-baseweb="select"] div {
-            color: #333333 !important; 
+        /* ========== 6. 關鍵修復：所有輸入框強制「白底黑字」 ========== */
+        /* 無論在側邊欄還是主畫面，輸入框一律白底，這樣就不會被深色模式影響 */
+
+        /* 下拉選單 (Selectbox) 的外框 */
+        div[data-baseweb="select"] > div {
+            background-color: #ffffff !important;
+            border-color: #d1d5db !important;
+            color: #333333 !important;
         }
         
-        /* 針對側邊欄內的 SVG 圖示 (例如閃電/大腦圖示) -> 強制深色 */
-        section[data-testid="stSidebar"] div[data-baseweb="select"] svg {
-            fill: #333333 !important;
-        }
-        
-        /* 針對側邊欄內的文字輸入框 (Ticker Input) -> 強制文字為黑色 */
-        section[data-testid="stSidebar"] input {
+        /* 文字輸入框 (TextInput) 的外框 */
+        div[data-baseweb="input"] > div {
+            background-color: #ffffff !important;
+            border-color: #d1d5db !important;
             color: #333333 !important;
         }
 
-        /* 修正表格內的文字顏色 */
+        /* 輸入框內的文字顏色 (強制深黑) */
+        div[data-baseweb="select"] div,
+        div[data-baseweb="input"] input {
+            color: #333333 !important;
+            -webkit-text-fill-color: #333333 !important; /* 相容 Safari */
+            caret-color: #333333 !important; /* 游標顏色 */
+        }
+
+        /* 下拉選單的箭頭圖示 */
+        div[data-baseweb="select"] svg {
+            fill: #333333 !important;
+        }
+
+        /* 下拉選單彈出的選項清單 (Popover) */
+        div[data-baseweb="popover"] div {
+            background-color: #ffffff !important;
+            color: #333333 !important;
+        }
+        
+        /* 表格文字 */
         div[data-testid="stTable"] {
             color: #333333 !important;
         }
