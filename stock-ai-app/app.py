@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 import streamlit.components.v1 as components
 import yfinance as yf  # 抓 Yahoo 股價
 
+# 假設這些模組您本地都有，請保持不動
 from core.data_fetch import (
     fetch_us_stock,
     fetch_earnings_summary,
@@ -31,57 +32,83 @@ MODEL_OPTIONS = {
 st.set_page_config(page_title="美股 AI 分析工具（Gemini 版）", layout="wide")
 
 
-# ========= 全域 UI 美化 =========
+# ========= 全域 UI 美化 (已修復深色模式文字問題) =========
 def inject_global_css():
     st.markdown(
         """
         <style>
+        /* 1. 強制主要區域文字顏色為深色 (解決深色模式下白字白底的問題) */
+        .stApp {
+            background-color: #f5f7fb;
+            color: #333333 !important;
+        }
+
+        /* 2. 確保主要內容區背景一致 */
         .main {
             background-color: #f5f7fb;
         }
-        .stApp {
-            background-color: #f5f7fb;
-        }
 
+        /* 3. 標題強制深色 */
         h1, h2, h3 {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: #0f172a !important; /* 深藍黑色 */
         }
+        
         h1 {
             font-weight: 700;
         }
 
+        /* 4. 卡片樣式：強制背景白、文字深 */
         .ai-card {
             padding: 1.1rem 1.2rem;
             border-radius: 0.9rem;
             background: #ffffff;
             box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
             margin-bottom: 1.2rem;
+            color: #333333 !important; /* 確保卡片內文字也是深色 */
         }
 
         .ai-card-title {
             font-weight: 600;
             font-size: 1.05rem;
             margin-bottom: 0.6rem;
+            color: #0f172a !important; /* 卡片標題深色 */
         }
 
+        /* 5. Expander 樣式調整 */
         .streamlit-expanderHeader {
             font-weight: 600;
+            color: #333333 !important;
         }
         .streamlit-expander {
             border-radius: 0.75rem !important;
             box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
             border: 1px solid #e2e8f0;
+            color: #333333 !important;
+        }
+        
+        .streamlit-expanderContent {
+            color: #333333 !important;
         }
 
+        /* 6. 側邊欄維持深色背景 + 淺色文字 */
         section[data-testid="stSidebar"] {
             background-color: #0f172a;
-            color: #e5e7eb;
+            color: #e5e7eb !important; /* 強制側邊欄文字淺色 */
         }
         section[data-testid="stSidebar"] h1,
         section[data-testid="stSidebar"] h2,
         section[data-testid="stSidebar"] h3,
-        section[data-testid="stSidebar"] label {
+        section[data-testid="stSidebar"] label,
+        section[data-testid="stSidebar"] span,
+        section[data-testid="stSidebar"] div,
+        section[data-testid="stSidebar"] p {
             color: #e5e7eb !important;
+        }
+        
+        /* 修正表格內的文字顏色 */
+        div[data-testid="stTable"] {
+            color: #333333 !important;
         }
         </style>
         """,
@@ -336,6 +363,10 @@ def render_pro_chart(hist: pd.DataFrame, period: str):
         height=560,
         xaxis_rangeslider_visible=False,
         template="plotly_white",
+        # 強制 Plotly 圖表背景為白色，避免繼承深色主題
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        font=dict(color="black")
     )
 
     fig_json = fig.to_json()
@@ -840,4 +871,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
