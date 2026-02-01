@@ -32,7 +32,7 @@ MODEL_OPTIONS = {
 st.set_page_config(page_title="美股 AI 分析工具（Gemini 版）", layout="wide")
 
 
-# ========= 全域 UI 美化 (已修復深色模式文字問題) =========
+# ========= 全域 UI 美化 (V3 修復版：修正側邊欄選單反白問題) =========
 def inject_global_css():
     st.markdown(
         """
@@ -91,11 +91,13 @@ def inject_global_css():
             color: #333333 !important;
         }
 
-        /* 6. 側邊欄維持深色背景 + 淺色文字 */
+        /* 6. 側邊欄維持深色背景 + 淺色文字 (大原則) */
         section[data-testid="stSidebar"] {
             background-color: #0f172a;
-            color: #e5e7eb !important; /* 強制側邊欄文字淺色 */
+            color: #e5e7eb !important; 
         }
+        
+        /* 側邊欄的一般標籤文字 */
         section[data-testid="stSidebar"] h1,
         section[data-testid="stSidebar"] h2,
         section[data-testid="stSidebar"] h3,
@@ -105,7 +107,24 @@ def inject_global_css():
         section[data-testid="stSidebar"] p {
             color: #e5e7eb !important;
         }
+
+        /* ========== 7. 修正側邊欄內的輸入框/下拉選單 (關鍵修正) ========== */
         
+        /* 針對側邊欄內的 Selectbox (下拉選單) 容器 -> 強制文字為黑色 */
+        section[data-testid="stSidebar"] div[data-baseweb="select"] div {
+            color: #333333 !important; 
+        }
+        
+        /* 針對側邊欄內的 SVG 圖示 (例如閃電/大腦圖示) -> 強制深色 */
+        section[data-testid="stSidebar"] div[data-baseweb="select"] svg {
+            fill: #333333 !important;
+        }
+        
+        /* 針對側邊欄內的文字輸入框 (Ticker Input) -> 強制文字為黑色 */
+        section[data-testid="stSidebar"] input {
+            color: #333333 !important;
+        }
+
         /* 修正表格內的文字顏色 */
         div[data-testid="stTable"] {
             color: #333333 !important;
